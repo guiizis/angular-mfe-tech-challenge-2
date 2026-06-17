@@ -1,59 +1,121 @@
-# App
+# Financial Visibility Angular MFE
 
-This project was generated using [Angular CLI](https://github.com/angular/angular-cli) version 22.0.1.
+Microfrontend Angular exposto para um host Next.js/React.
 
-## Development server
+## Arquitetura
 
-To start a local development server, run:
+- **Framework do MFE:** Angular 22.
+- **Host esperado:** Next.js/React.
+- **Federation:** `@angular-architects/native-federation`, compatível com o builder moderno do Angular baseado em esbuild.
+- **Integração visual:** Web Component via `@angular/elements`.
+- **Tag exposta:** `<mcintosh-financial-visibility></mcintosh-financial-visibility>`.
+- **Remote name:** `financialVisibilityMfe`.
+- **Remote entry local:** `http://localhost:4201/remoteEntry.json`.
+- **Modulo exposto:** `./register`.
 
-```bash
-ng serve
-```
+O host Next.js fica responsavel pelo roteamento macro, por exemplo `/visibilidade-financeira`.
+O microfrontend Angular fica encapsulado dentro dessa rota. Caso o MFE precise de rotas internas, ele usa hash routing para evitar conflito com as rotas do Next.
 
-Once the server is running, open your browser and navigate to `http://localhost:4200/`. The application will automatically reload whenever you modify any of the source files.
-
-## Code scaffolding
-
-Angular CLI includes powerful code scaffolding tools. To generate a new component, run:
-
-```bash
-ng generate component component-name
-```
-
-For a complete list of available schematics (such as `components`, `directives`, or `pipes`), run:
+## Desenvolvimento
 
 ```bash
-ng generate --help
+npm install --legacy-peer-deps
+npm start
 ```
 
-## Building
+O servidor local sobe em:
 
-To build the project run:
+```txt
+http://localhost:4201
+```
+
+## Build
 
 ```bash
-ng build
+npm run build
 ```
 
-This will compile your project and store the build artifacts in the `dist/` directory. By default, the production build optimizes your application for performance and speed.
+O build gera o `remoteEntry.json` em:
 
-## Running unit tests
-
-To execute unit tests with the [Vitest](https://vitest.dev/) test runner, use the following command:
-
-```bash
-ng test
+```txt
+dist/app/browser/remoteEntry.json
 ```
 
-## Running end-to-end tests
+## Contrato de comunicacao
 
-For end-to-end (e2e) testing, run:
+Entrada do host para o MFE:
 
-```bash
-ng e2e
+```html
+<mcintosh-financial-visibility customer-id="123"></mcintosh-financial-visibility>
 ```
 
-Angular CLI does not come with an end-to-end testing framework by default. You can choose one that suits your needs.
+Saida do MFE para o host:
 
-## Additional Resources
+```ts
+element.addEventListener('visibilityItemSelected', (event) => {
+  console.log(event.detail);
+});
+```
 
-For more information on using the Angular CLI, including detailed command references, visit the [Angular CLI Overview and Command Reference](https://angular.dev/tools/cli) page.
+## Exemplo de consumo no Next.js
+
+No host Next.js, carregue esse MFE apenas no client side.
+
+```tsx
+'use client';
+
+import { useEffect, useRef } from 'react';
+import { initFederation, loadRemoteModule } from '@angular-architects/native-federation';
+
+export function FinancialVisibilityMfe() {
+  const elementRef = useRef<HTMLElement | null>(null);
+
+  useEffect(() => {
+    let active = true;
+
+    async function loadMfe() {
+      await initFederation({
+        financialVisibilityMfe: 'http://localhost:4201/remoteEntry.json',
+      });
+
+      await loadRemoteModule('financialVisibilityMfe', './register');
+
+      if (!active || !elementRef.current) {
+        return;
+      }
+
+      elementRef.current.setAttribute('customer-id', '123');
+    }
+
+    loadMfe().catch(console.error);
+
+    const element = elementRef.current;
+    const onSelected = (event: Event) => {
+      console.log((event as CustomEvent).detail);
+    };
+
+    element?.addEventListener('visibilityItemSelected', onSelected);
+
+    return () => {
+      active = false;
+      element?.removeEventListener('visibilityItemSelected', onSelected);
+    };
+  }, []);
+
+  return <mcintosh-financial-visibility ref={elementRef} />;
+}
+```
+
+Para TypeScript aceitar a tag no React, adicione uma declaracao global no host:
+
+```ts
+declare namespace JSX {
+  interface IntrinsicElements {
+    'mcintosh-financial-visibility': React.DetailedHTMLProps<
+      React.HTMLAttributes<HTMLElement>,
+      HTMLElement
+    >;
+  }
+}
+```
+

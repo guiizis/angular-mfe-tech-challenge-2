@@ -1,4 +1,4 @@
-import { Component } from '@angular/core';
+import { Component, EventEmitter, Input, Output } from '@angular/core';
 import { Color, PieChartModule, ScaleType } from '@swimlane/ngx-charts';
 import { financialVisibility } from './data';
 
@@ -9,6 +9,9 @@ import { financialVisibility } from './data';
   styleUrl: './app.scss'
 })
 export class App {
+  @Input() customerId?: string;
+  @Output() visibilityItemSelected = new EventEmitter<unknown>();
+
   financialVisibility = financialVisibility;
   view: [number, number] = [900, 420];
 
@@ -33,6 +36,7 @@ export class App {
   }));
 
   onSelect(data: any): void {
+    this.visibilityItemSelected.emit(data);
     console.log('Item clicked', JSON.parse(JSON.stringify(data)));
   }
 
